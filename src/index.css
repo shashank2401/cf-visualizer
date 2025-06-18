@@ -1,0 +1,32 @@
+/* src/index.css */
+
+/* Import Tailwind CSS v4 (new syntax) */
+@import "tailwindcss";
+
+body {
+  @apply bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+html {
+  transition: background-color 0.2s;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  background: #e5e7eb;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+
+.recharts-line-curve {
+  stroke-dasharray: none !important;
+}
+
+.recharts-sector:focus,
+.recharts-surface:focus,
+.recharts-wrapper:focus {
+  outline: none;
+}

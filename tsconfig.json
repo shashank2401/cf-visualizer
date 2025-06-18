@@ -1,0 +1,24 @@
+// tsconfig.json (at your project root: c:/dev/cf-visualizer/tsconfig.json)
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "module": "ESNext",
+    "skipLibCheck": true, // <--- Crucial: Prevents checking installed library's types
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx", // Needed for your React frontend
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "strict": true,
+    "noEmit": true,
+    "allowJs": true // <--- Crucial: Allows TypeScript to process .js and .jsx files
+  },
+  "include": [
+    "src", // Tells TypeScript to look in your frontend source
+  ],
+  "exclude": [
+    "node_modules", // <--- CRITICAL: Prevents TypeScript from looking inside node_modules
+    "dist"          // Exclude build output
+  ]
+}
