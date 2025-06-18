@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
-
-// Client-side cache for useContests hook
-const cache = new Map();
-// Define how long entries are valid in the client-side cache (e.g., 10 minutes)
-const CLIENT_CACHE_DURATION_MS = 10 * 60 * 1000;
+import { getFromCache, setInCache } from "../utils/cache";
 
 // This variable stores a timestamp indicating when the client should retry after a 429 error
 // It's declared outside the hook to persist across hook invocations within the same browser session.
@@ -29,10 +25,10 @@ export default function useContests(handle) {
     }
 
     const normalizedHandle = handle.trim();
-    const cached = cache.get(normalizedHandle);
+    const cached = getFromCache(`contests:${normalizedHandle}`);
 
-    // Check client-side cache for data and its freshness
-    if (cached && (Date.now() - cached.timestamp < CLIENT_CACHE_DURATION_MS)) {
+    // Check client-side cache for data
+    if (cached) {
       setContests(cached.contests);
       setRatingChanges(cached.ratingChanges);
       setError(cached.error || "");
@@ -96,11 +92,10 @@ export default function useContests(handle) {
           }));
 
           // Store data in client-side cache with timestamp
-          cache.set(normalizedHandle, {
+          setInCache(`contests:${normalizedHandle}`, {
             contests: formatted,
             ratingChanges: data.result, // `data.result` is already the raw rating changes
             error: null,
-            timestamp: Date.now() // Store the timestamp
           });
 
           if (!cancelled) {
@@ -114,23 +109,21 @@ export default function useContests(handle) {
               : data.comment || "Unknown error";
           
           // Cache the error response with a timestamp as well
-          cache.set(normalizedHandle, {
+          setInCache(`contests:${normalizedHandle}`, {
             contests: [],
             ratingChanges: [],
             error: errorMessage,
-            timestamp: Date.now() // Store timestamp for errors too
           });
           throw new Error(errorMessage);
         }
       } catch (err) {
         if (!cancelled) {
           // If the error was not explicitly cached above (e.g., network error before parsing JSON), cache it here
-          if (!cache.has(normalizedHandle) || cache.get(normalizedHandle).timestamp === undefined) {
-              cache.set(normalizedHandle, {
+          if (!getFromCache(`contests:${normalizedHandle}`)) {
+              setInCache(`contests:${normalizedHandle}`, {
                   contests: [],
                   ratingChanges: [],
                   error: err.message || "An unexpected error occurred.",
-                  timestamp: Date.now()
               });
           }
           setError(err.message || "An unexpected error occurred.");
