@@ -26,7 +26,7 @@ export default function useUserData(handle) {
       return;
     }
 
-    const normalizedHandle = handle.toLowerCase();
+    const normalizedHandle = handle.trim();
     const cached = cache.get(normalizedHandle);
 
     // Check client-side cache for data and its freshness
