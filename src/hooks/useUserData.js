@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
-
-// Client-side cache for useUserData hook
-const cache = new Map();
-// Define how long entries are valid in the client-side cache (e.g., 10 minutes)
-const CLIENT_CACHE_DURATION_MS = 10 * 60 * 1000;
+import { getFromCache, setInCache } from "../utils/cache";
 
 // This variable stores a timestamp indicating when the client should retry after a 429 error
 // It's declared outside the hook to persist across hook invocations within the same browser session.
@@ -27,10 +23,10 @@ export default function useUserData(handle) {
     }
 
     const normalizedHandle = handle.trim();
-    const cached = cache.get(normalizedHandle);
+    const cached = getFromCache(`user-data:${normalizedHandle}`);
 
-    // Check client-side cache for data and its freshness
-    if (cached && (Date.now() - cached.timestamp < CLIENT_CACHE_DURATION_MS)) {
+    // Check client-side cache for data
+    if (cached) {
       setUser(cached.data);
       setError(cached.error || "");
       setLoading(false);
@@ -90,7 +86,7 @@ export default function useUserData(handle) {
 
           if (!result) {
               const errorMessage = `User '${normalizedHandle}' not found or invalid response structure.`;
-              cache.set(normalizedHandle, { data: null, error: errorMessage, timestamp: Date.now() });
+              setInCache(`user-data:${normalizedHandle}`, { data: null, error: errorMessage });
               throw new Error(errorMessage);
           }
 
@@ -104,7 +100,7 @@ export default function useUserData(handle) {
           };
 
           // Store data in client-side cache with timestamp
-          cache.set(normalizedHandle, { data: userData, error: null, timestamp: Date.now() });
+          setInCache(`user-data:${normalizedHandle}`, { data: userData, error: null });
           if (!cancelled) setUser(userData);
         } else {
           // If the API indicates an error in its 'status' field (e.g., "FAILED")
@@ -114,17 +110,16 @@ export default function useUserData(handle) {
               : data.comment || "Unknown error";
           
           // Cache the error response with a timestamp as well
-          cache.set(normalizedHandle, { data: null, error: errorMessage, timestamp: Date.now() });
+          setInCache(`user-data:${normalizedHandle}`, { data: null, error: errorMessage });
           throw new Error(errorMessage);
         }
       } catch (err) {
         if (!cancelled) {
           // If the error was not explicitly cached above (e.g., network error before parsing JSON), cache it here
-          if (!cache.has(normalizedHandle) || cache.get(normalizedHandle).timestamp === undefined) {
-              cache.set(normalizedHandle, {
+          if (!getFromCache(`user-data:${normalizedHandle}`)) {
+              setInCache(`user-data:${normalizedHandle}`, {
                   data: null,
                   error: err.message || "An unexpected error occurred.", // Ensure error message exists
-                  timestamp: Date.now()
               });
           }
           setError(err.message || "An unexpected error occurred.");

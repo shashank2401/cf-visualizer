@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
-
-// Client-side cache for useSubmissions hook
-const cache = new Map();
-// Define how long entries are valid in the client-side cache (e.g., 10 minutes)
-const CLIENT_CACHE_DURATION_MS = 10 * 60 * 1000;
+import { getFromCache, setInCache } from "../utils/cache";
 
 // This variable stores a timestamp indicating when the client should retry after a 429 error
 // It's declared outside the hook to persist across hook invocations within the same browser session.
@@ -11,6 +7,7 @@ let globalRetryAfter = 0;
 
 const CODEFORCES_API_BASE_URL = "https://codeforces.com/api";
 
+const SUBMISSIONS_COUNT = 2000;
 const TARGET_API_URL_TEMPLATE = `${CODEFORCES_API_BASE_URL}/user.status?handle=`;
 
 export default function useSubmissions(handle) {
@@ -27,10 +24,10 @@ export default function useSubmissions(handle) {
     }
 
     const normalizedHandle = handle.trim();
-    const cached = cache.get(normalizedHandle);
+    const cached = getFromCache(`submissions:${normalizedHandle}`);
 
-    // Check client-side cache for data and its freshness
-    if (cached && (Date.now() - cached.timestamp < CLIENT_CACHE_DURATION_MS)) {
+    // Check client-side cache for data
+    if (cached) {
       setSubmissions(cached.data);
       setError(cached.error || "");
       setLoading(false);
@@ -55,7 +52,7 @@ export default function useSubmissions(handle) {
         }
 
         // --- CRITICAL CHANGE: Use the full external URL ---
-        const url = `${TARGET_API_URL_TEMPLATE}${normalizedHandle}`;
+        const url = `${TARGET_API_URL_TEMPLATE}${normalizedHandle}&from=1&count=${SUBMISSIONS_COUNT}`;
         const res = await fetch(url, { signal: controller.signal });
 
         if (!res.ok) { // Check for non-2xx status codes
@@ -84,7 +81,7 @@ export default function useSubmissions(handle) {
         // { "status": "OK", "result": [{ id: ..., problem: { name: ... }, verdict: ... }, ...] }
         if (data.status === "OK") {
           // Store data in client-side cache with timestamp
-          cache.set(normalizedHandle, { data: data.result, error: null, timestamp: Date.now() });
+          setInCache(`submissions:${normalizedHandle}`, { data: data.result, error: null });
           if (!cancelled) setSubmissions(data.result);
         } else {
           const errorMessage = 
@@ -93,17 +90,16 @@ export default function useSubmissions(handle) {
               : data.comment || "Failed to fetch submissions";
 
           // Cache the error response with a timestamp as well
-          cache.set(normalizedHandle, { data: [], error: errorMessage, timestamp: Date.now() });
+          setInCache(`submissions:${normalizedHandle}`, { data: [], error: errorMessage });
           throw new Error(errorMessage);
         }
       } catch (err) {
         if (!cancelled) {
           // If the error was not explicitly cached above (e.g., network error before parsing JSON), cache it here
-          if (!cache.has(normalizedHandle) || cache.get(normalizedHandle).timestamp === undefined) {
-              cache.set(normalizedHandle, {
+          if (!getFromCache(`submissions:${normalizedHandle}`)) {
+              setInCache(`submissions:${normalizedHandle}`, {
                   data: [],
                   error: err.message || "An unexpected error occurred.",
-                  timestamp: Date.now()
               });
           }
           setError(err.message || "An unexpected error occurred.");
