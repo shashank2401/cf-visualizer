@@ -9,10 +9,7 @@ function getDuelResult(rank1, rank2) {
   return 0;
 }
 
-export default function ContestDuelTable({ contests, userLabels = ["User 1", "User 2"] }) {
-  // contests: [{ contestId, contestName, user1Rank, user2Rank, contestDate }]
-  // userLabels: [user1handle, user2handle]
-
+export default function ContestDuelTable({ contests, userLabels, duelStats }) {
   if (!contests || !contests.length) {
     return (
       <div className="w-full h-40 flex items-center justify-center bg-white dark:bg-gray-900 rounded-xl shadow mt-6">
@@ -20,15 +17,9 @@ export default function ContestDuelTable({ contests, userLabels = ["User 1", "Us
       </div>
     );
   }
-
-  // Calculate duel record
-  let user1Wins = 0, user2Wins = 0, draws = 0;
-  contests.forEach(c => {
-    const result = getDuelResult(c.user1Rank, c.user2Rank);
-    if (result === 1) user1Wins++;
-    else if (result === -1) user2Wins++;
-    else draws++;
-  });
+  
+  const { user1Wins, user2Wins } = duelStats;
+  const draws = contests.length - user1Wins - user2Wins;
 
   return (
     <div className="w-full max-w-3xl mx-auto bg-white dark:bg-gray-900 rounded-xl shadow p-4 mt-6 overflow-x-auto">
@@ -51,7 +42,7 @@ export default function ContestDuelTable({ contests, userLabels = ["User 1", "Us
         </thead>
         <tbody>
           {contests.map((c, idx) => {
-            const result = getDuelResult(c.user1Rank, c.user2Rank);
+            const result = getDuelResult(c.handle1.rank, c.handle2.rank);
             let winnerCell;
             if (result === 1)
               winnerCell = (
@@ -85,8 +76,8 @@ export default function ContestDuelTable({ contests, userLabels = ["User 1", "Us
                     {c.contestName}
                   </a>
                 </td>
-                <td className="py-1 px-2">{c.user1Rank}</td>
-                <td className="py-1 px-2">{c.user2Rank}</td>
+                <td className="py-1 px-2">{c.handle1.rank}</td>
+                <td className="py-1 px-2">{c.handle2.rank}</td>
                 <td className="py-1 px-2">{winnerCell}</td>
               </tr>
             );

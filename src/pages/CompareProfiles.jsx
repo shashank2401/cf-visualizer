@@ -250,7 +250,14 @@ export default function CompareProfiles() {
           </SectionContainer>
 
           <SectionContainer title="Contest Duels">
-            <ContestDuelTable data={commonContestsData} />
+            <ContestDuelTable 
+              contests={commonContestsData.common} 
+              userLabels={userLabels}
+              duelStats={{
+                user1Wins: commonContestsData.h1Wins,
+                user2Wins: commonContestsData.h2Wins
+              }}
+            />
           </SectionContainer>
         </div>
       )}
