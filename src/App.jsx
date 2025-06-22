@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom';
 import AppRoutes from './routes';
 import Footer from './components/ui/Footer';
 import Navbar from './components/ui/Navbar';
+import { Analytics } from '@vercel/analytics/react';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
         </main>
         <Footer />
       </BrowserRouter>
+      <Analytics />
     </div>
   );
 }
