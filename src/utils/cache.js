@@ -1,4 +1,5 @@
 // src/utils/cache.js
+
 const CACHE_PREFIX = 'cf-visualizer-cache:';
 const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -8,7 +9,7 @@ function getCacheKey(key) {
 
 export function getFromCache(key) {
   const cacheKey = getCacheKey(key);
-  const cachedItem = sessionStorage.getItem(cacheKey);
+  const cachedItem = localStorage.getItem(cacheKey);
 
   if (!cachedItem) {
     return null;
@@ -20,11 +21,11 @@ export function getFromCache(key) {
       return data;
     }
     // Cache expired, remove it
-    sessionStorage.removeItem(cacheKey);
+    localStorage.removeItem(cacheKey);
     return null;
   } catch (e) {
     // Invalid JSON, remove it
-    sessionStorage.removeItem(cacheKey);
+    localStorage.removeItem(cacheKey);
     return null;
   }
 }
@@ -35,5 +36,10 @@ export function setInCache(key, data) {
     data,
     timestamp: Date.now(),
   };
-  sessionStorage.setItem(cacheKey, JSON.stringify(itemToCache));
-} 
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify(itemToCache));
+  } catch (err) {
+    // Could be quota exceeded — fail silently or log
+    console.warn(`Failed to set cache for ${cacheKey}:`, err);
+  }
+}

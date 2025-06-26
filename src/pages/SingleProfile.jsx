@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ProfileHeader from "../components/profile/ProfileHeader";
 import ProfileCard from "../components/profile/ProfileCard";
 import FactsGrid from "../components/profile/FactsGrid";
@@ -16,10 +16,7 @@ import useUserData from "../hooks/useUserData";
 import useSubmissions from "../hooks/useSubmissions";
 import useContests from "../hooks/useContests";
 
-import {
-  getTotalSolved,
-  formatDate,
-} from "../utils/profile-stats";
+import { getTotalSolved, formatDate } from "../utils/profile-stats";
 import {
   formatLanguagesData,
   formatVerdictsData,
@@ -28,156 +25,129 @@ import {
   formatHeatmapData,
 } from "../utils/chart-formatters";
 
+// Helper to render async sections
+function AsyncSection({ loading, error, title, skeletonLines = 5, children }) {
+  if (loading) return <LoadingSkeleton lines={skeletonLines} />;
+  if (error) return <ErrorMessage message={error} />;
+  return <SectionContainer title={title}>{children}</SectionContainer>;
+}
+
 export default function SingleProfile() {
   const [handle, setHandle] = useState("");
   const [submittedHandle, setSubmittedHandle] = useState("");
   const [formError, setFormError] = useState(null);
+
+  // Prevent double-fetch in StrictMode
+  const didFetchRef = useRef(false);
 
   // Data fetching hooks
   const { user, loading: userLoading, error: userError } = useUserData(submittedHandle);
   const { submissions, loading: subsLoading, error: subsError } = useSubmissions(submittedHandle);
   const { contests, ratingChanges, loading: contestsLoading, error: contestsError } = useContests(submittedHandle);
 
-  const isLoading = userLoading; // Primary loading state is for the user data
-  const hasLoadedUserData = !!user && !userLoading && !userError;
+  const isLoading = userLoading;
+  const hasUser = !!user && !userLoading && !userError;
 
   // Derived stats for FactsGrid
-  const facts = hasLoadedUserData && contests && submissions
+  const facts = hasUser && contests.length && submissions
     ? {
         contests: contests.length,
-        bestRank: contests.length ? Math.min(...contests.map(c => c.rank)) : "-",
-        worstRank: contests.length ? Math.max(...contests.map(c => c.rank)) : "-",
+        bestRank: Math.min(...contests.map(c => c.rank)),
+        worstRank: Math.max(...contests.map(c => c.rank)),
         totalSolved: getTotalSolved(submissions),
-        firstContest: contests.length && contests[0]?.date ? formatDate(contests[0].date) : "-",
-        lastContest: contests.length && contests[contests.length - 1]?.date ? formatDate(contests[contests.length - 1].date) : "-",
+        firstContest: formatDate(contests[0].date),
+        lastContest: formatDate(contests[contests.length - 1].date),
       }
     : null;
 
-  // Chart data formatters - ensure data exists before formatting
-  const heatmapData = submissions ? formatHeatmapData(submissions) : [];
-  const languagesData = submissions ? formatLanguagesData(submissions, 6) : [];
-  const verdictsData = submissions ? formatVerdictsData(submissions) : [];
-  const tagsData = submissions ? formatTagsData(submissions, 8) : [];
-  const ratingBarData = submissions ? formatRatingWiseData(submissions) : [];
+  // Chart data
+  const heatmapData = formatHeatmapData(submissions);
+  const languagesData = formatLanguagesData(submissions, 6);
+  const verdictsData = formatVerdictsData(submissions);
+  const tagsData = formatTagsData(submissions, 8);
+  const ratingBarData = formatRatingWiseData(submissions);
 
-  // Form submit handler
+  // Handle form submit with CF handle-length validation
   function handleSubmit(e) {
     e.preventDefault();
     const trimmed = handle.trim();
-    if (!trimmed) {
-      setFormError("Please enter a Codeforces handle.");
-      setSubmittedHandle("");
+    if (trimmed.length < 3 || trimmed.length > 24) {
+      setFormError("Handle must be between 3 and 24 characters");
       return;
     }
     setFormError(null);
     setSubmittedHandle(trimmed);
   }
 
-  function handleInputChange(e) {
-    setHandle(e.target.value);
-    if (e.target.value.trim() === "") {
-        setSubmittedHandle("");
-        setFormError(null);
-    }
-  }
+  // Disable button while loading
+  const buttonLabel = userLoading ? "Loading…" : "Show Profile";
 
   return (
     <div className="pb-12 px-4 md:px-6 lg:px-8">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-xl mx-auto mt-8 mb-6 flex gap-2"
-        autoComplete="off"
-      >
+      <form onSubmit={handleSubmit} className="w-full max-w-xl mx-auto mt-8 mb-6 flex gap-2" autoComplete="off">
         <input
           type="text"
           placeholder="Enter Codeforces handle"
-          className="flex-1 px-4 py-2 rounded-l-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 px-4 py-2 rounded-l-lg border bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
           value={handle}
-          onChange={handleInputChange}
+          onChange={e => setHandle(e.target.value)}
           required
         />
         <button
           type="submit"
-          className="px-6 py-2 rounded-r-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition"
+          disabled={userLoading}
+          className={`px-6 py-2 rounded-r-lg font-semibold transition ${
+            userLoading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"
+          }`}
         >
-          Show Profile
+          {buttonLabel}
         </button>
       </form>
 
-      {formError && <ErrorMessage message={formError} />}
-      {userError && <ErrorMessage message={userError} />}
+      {(formError || userError) && <ErrorMessage message={formError || userError} />}
 
-      {isLoading && (
-        <SectionContainer>
-          <LoadingSkeleton lines={8} />
-        </SectionContainer>
+      {isLoading && !userError && (
+        <SectionContainer><LoadingSkeleton lines={8} /></SectionContainer>
       )}
 
-      {hasLoadedUserData ? (
+      {hasUser && (
         <>
-          <div className="px-4 md:px-6 lg:px-8">
-            <ProfileHeader handle={user.handle} tagline="Visualizing your Codeforces journey" />
-          </div>
-          <SectionContainer>
-            <ProfileCard user={user} />
-          </SectionContainer>
-
+          <ProfileHeader handle={user.handle} tagline="Visualizing your Codeforces journey" />
+          <SectionContainer><ProfileCard user={user} /></SectionContainer>
           <SectionContainer>
             <p className="text-sm text-center text-gray-500 italic">
               Note: To ensure a smooth experience and avoid API limits, all statistics are based on the last 2000 submissions.
             </p>
           </SectionContainer>
 
-          {contestsLoading ? <LoadingSkeleton lines={3} /> : contestsError ? <ErrorMessage message={contestsError} /> : facts && (
-            <SectionContainer>
-              <FactsGrid stats={facts} />
-            </SectionContainer>
-          )}
+          <AsyncSection loading={contestsLoading} error={contestsError} title="Contest Stats" skeletonLines={3}>
+            <FactsGrid stats={facts} />
+          </AsyncSection>
 
-          {contestsLoading ? <LoadingSkeleton lines={6} /> : contestsError ? <ErrorMessage message={contestsError} /> : ratingChanges && (
-            <SectionContainer title="Rating Changes Over Time">
-              <RatingGraph data={ratingChanges} />
-            </SectionContainer>
-          )}
+          <AsyncSection loading={contestsLoading} error={contestsError} title="Rating Changes Over Time" skeletonLines={6}>
+            <RatingGraph data={ratingChanges} />
+          </AsyncSection>
 
-          {subsLoading ? <LoadingSkeleton lines={6} /> : subsError ? <ErrorMessage message={subsError} /> : heatmapData && (
-            <SectionContainer title="Submission Activity Heatmap">
-              <SubmissionHeatmap submissions={heatmapData} />
-            </SectionContainer>
-          )}
+          <AsyncSection loading={subsLoading} error={subsError} title="Submission Activity Heatmap" skeletonLines={6}>
+            <SubmissionHeatmap submissions={heatmapData} />
+          </AsyncSection>
 
-          <div className="grid md:grid-cols-3 gap-4 px-4 md:px-6 lg:px-8">
-            {subsLoading ? <LoadingSkeleton lines={5} /> : subsError ? <ErrorMessage message={subsError} /> : languagesData && (
-              <SectionContainer title="Languages Used">
-                <LanguagesPie data={languagesData} />
-              </SectionContainer>
-            )}
-            {subsLoading ? <LoadingSkeleton lines={5} /> : subsError ? <ErrorMessage message={subsError} /> : verdictsData && (
-              <SectionContainer title="Verdicts Distribution">
-                <VerdictPie data={verdictsData} />
-              </SectionContainer>
-            )}
-            {subsLoading ? <LoadingSkeleton lines={5} /> : subsError ? <ErrorMessage message={subsError} /> : tagsData && (
-              <SectionContainer title="Tags Distribution">
-                <TagsPie data={tagsData} />
-              </SectionContainer>
-            )}
+          <div className="grid md:grid-cols-3 gap-4">
+            <AsyncSection loading={subsLoading} error={subsError} title="Languages Used">
+              <LanguagesPie data={languagesData} />
+            </AsyncSection>
+            <AsyncSection loading={subsLoading} error={subsError} title="Verdicts Distribution">
+              <VerdictPie data={verdictsData} />
+            </AsyncSection>
+            <AsyncSection loading={subsLoading} error={subsError} title="Tags Distribution">
+              <TagsPie data={tagsData} />
+            </AsyncSection>
           </div>
-          
-          {subsLoading ? <LoadingSkeleton lines={6} /> : subsError ? <ErrorMessage message={subsError} /> : ratingBarData && (
-            <SectionContainer title="Problems Solved by Rating">
-              <RatingWiseBarChart data={ratingBarData} />
-            </SectionContainer>
-          )}
+
+          <AsyncSection loading={subsLoading} error={subsError} title="Problems Solved by Rating" skeletonLines={6}>
+            <RatingWiseBarChart data={ratingBarData} />
+          </AsyncSection>
         </>
-      ) : (
-        !submittedHandle && !isLoading && !userError && (
-          <SectionContainer>
-            <div className="text-center text-gray-400 dark:text-gray-600 py-8">
-              Enter a Codeforces handle to view profile statistics.
-            </div>
-          </SectionContainer>
-        )
       )}
     </div>
   );
